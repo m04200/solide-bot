@@ -116,8 +116,10 @@ ${process.env.PAYPAL_LINK}`;
     message.reply(reply);
 
   } catch (err) {
-    console.log("❌ IA ERROR:", err.message);
-    message.reply("❌ Erreur IA temporaire, réessaie.");
+  console.log("❌ OPENAI FULL ERROR:", JSON.stringify(err.response?.data, null, 2));
+  console.log("❌ MESSAGE:", err.message);
+
+  message.reply("❌ IA erreur : " + (err.response?.data?.error?.message || err.message));
   }
 });
 

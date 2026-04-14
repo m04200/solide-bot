@@ -1,8 +1,19 @@
 require('dotenv').config();
+
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
 const express = require('express');
 
+/* 🔥 ANTI CRASH */
+process.on("unhandledRejection", (err) => {
+  console.log("❌ Unhandled Rejection:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.log("❌ Uncaught Exception:", err);
+});
+
+/* 🤖 DISCORD BOT */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -11,6 +22,7 @@ const client = new Client({
   ]
 });
 
+/* 🌐 EXPRESS SERVER (RENDER) */
 const app = express();
 
 /* 💚 PRODUITS SOLIDAZEN */
@@ -22,40 +34,37 @@ const produits = [
   { name: "Pack solidarité", price: "10€" }
 ];
 
-/* 🧠 PERSONNALITÉ IA (HUMAIN + SOLIDAIRE) */
+/* 🧠 IA PERSONNALITÉ */
 const SYSTEM_PROMPT = `
 Tu es l'assistant officiel de Solidazen.
 
-Ton rôle :
-- Parler comme un humain naturel, chaleureux et simple
-- Aider les personnes
-- Expliquer la boutique et les dons
-- Encourager sans forcer
-- Toujours orienté solidarité, entraide et anti-gaspillage
+Tu es :
+- humain, chaleureux, simple
+- orienté aide et solidarité
+- jamais agressif commercialement
 
-Si possible, tu peux proposer :
-- produits d’occasion Solidazen
-- dons PayPal pour soutenir l’association
-
-Tu ne dois jamais être agressif commercialement.
+Tu peux proposer :
+- dons Solidazen
+- produits d’occasion
 `;
 
-/* 🎯 choisir un produit aléatoire */
+/* 🎯 produit aléatoire */
 function randomProduct() {
   return produits[Math.floor(Math.random() * produits.length)];
 }
 
-/* 🤖 BOT READY */
+/* 🤖 READY */
 client.once('ready', () => {
   console.log("🤖 Solidazen IA Bot connecté !");
 });
 
-/* 💬 MESSAGE EVENT */
+/* 💬 MESSAGE IA */
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   try {
     const userMessage = message.content;
+    const text = userMessage.toLowerCase();
 
     /* 🧠 APPEL IA */
     const ia = await axios.post(
@@ -75,11 +84,10 @@ client.on('messageCreate', async (message) => {
       }
     );
 
-    let reply = ia.data.choices[0].message.content;
+    let reply = ia.data?.choices?.[0]?.message?.content 
+      || "Je n'ai pas compris 😅";
 
-    const text = userMessage.toLowerCase();
-
-    /* 🛒 LOGIQUE VENTE AUTOMATIQUE */
+    /* 🛒 LOGIQUE VENTE */
     if (
       text.includes("acheter") ||
       text.includes("produit") ||
@@ -88,9 +96,9 @@ client.on('messageCreate', async (message) => {
     ) {
       const p = randomProduct();
 
-      reply += `\n\n🛍️ Suggestion Solidazen :
+      reply += `\n\n🛍️ Produit Solidazen :
 👉 ${p.name} - ${p.price}
-💚 Soutenir / acheter :
+💚 Acheter / soutenir :
 ${process.env.PAYPAL_LINK}`;
     }
 
@@ -101,25 +109,28 @@ ${process.env.PAYPAL_LINK}`;
       text.includes("soutenir")
     ) {
       reply += `\n\n💚 Merci pour ton soutien !
-👉 Faire un don ici :
+👉 Faire un don :
 ${process.env.PAYPAL_LINK}`;
     }
 
     message.reply(reply);
 
   } catch (err) {
-    console.error(err);
-    message.reply("❌ Erreur IA temporaire, réessaie dans un instant.");
+    console.log("❌ IA ERROR:", err.message);
+    message.reply("❌ Erreur IA temporaire, réessaie.");
   }
 });
 
-/* 🌐 KEEP ALIVE (Render) */
+/* 🌐 KEEP ALIVE (RENDER) */
 app.get("/", (req, res) => {
   res.send("Solidazen bot actif 🤖");
 });
 
-app.listen(3000, () => {
-  console.log("Serveur actif sur port 3000");
+/* ⚡ PORT DYNAMIQUE (IMPORTANT RENDER) */
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🌐 Serveur actif sur port " + PORT);
 });
 
 /* 🔐 LOGIN DISCORD */

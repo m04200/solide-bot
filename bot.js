@@ -118,6 +118,7 @@ ${process.env.PAYPAL_LINK}`;
   }
 
   /* RELANCE AUTOMATIQUE (SECRET PUISSANT) */
+  const relances = {};
   if (users[userId].messages >= 3) {
     const p = suggestProduct(userId);
 
@@ -144,6 +145,19 @@ client.once('ready', () => {
 });
 
 /* 💬 MESSAGE */
+const userId = message.author.id;
+
+if (!relances[userId]) {
+  relances[userId] = setTimeout(() => {
+    message.channel.send(`💚 Juste pour te dire :
+
+Même 1€ peut vraiment aider quelqu’un.
+
+👉 ${process.env.PAYPAL_LINK}
+
+Merci 🙏`);
+  }, 60000); // 1 minute après
+}
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
@@ -165,3 +179,43 @@ app.listen(3000, () => {
 
 /* 🔐 LOGIN */
 client.login(process.env.DISCORD_TOKEN);
+});
+
+/* 📩 MESSAGE AUTO AUX NOUVEAUX (ULTRA PUISSANT) */
+client.on('guildMemberAdd', (member) => {
+  member.send(`Salut 👋 et bienvenue chez Solidazen 💚
+
+On aide concrètement les personnes en difficulté.
+
+👉 Tu peux aider facilement :
+- soit avec un petit don
+- soit en achetant solidaire
+
+💚 Lien direct :
+${process.env.PAYPAL_LINK}
+
+Merci d’être là 🙏`);
+});
+/* 🛒 COMMANDE DIRECTE (VENTE RAPIDE */
+if (message.content === "!boutique") {
+  message.reply(`🛍️ Boutique solidaire :
+
+DVD - 2€
+Livre - 1€
+Jeux - 3€
+Pack - 10€
+
+👉 Acheter ici :
+${process.env.PAYPAL_LINK}`);
+}
+});
+/* 💰 TRIGGER ULTRA PUISSANT (CONVERSION) */
+if (message.content.toLowerCase().includes("ok")) {
+  message.reply(`💚 Génial !
+
+👉 Tu peux soutenir ici :
+${process.env.PAYPAL_LINK}
+
+Chaque geste compte 🙏`);
+}
+});

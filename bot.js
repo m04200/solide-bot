@@ -21,51 +21,102 @@ const produits = [
   { name: "Pack solidarité", price: "10€" }
 ];
 
-/* 🎯 réponse humaine simulée */
-function reponseIA(message) {
-  const text = message.toLowerCase();
+/* 🎯 réponses variées */
+function random(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-  // SALUTATIONS
-  if (text.includes("bonjour") || text.includes("salut")) {
-    return "Salut 😊 ! Je suis là pour t’aider. Tu cherches à soutenir Solidazen ou à découvrir nos produits solidaires ?";
+/* 🧠 simulation IA humaine */
+function reponseIA(userMessage) {
+  const text = userMessage.toLowerCase();
+
+  // émotions / ton humain
+  const empathie = [
+    "Je vois 👍",
+    "Je comprends 💚",
+    "C’est super important 🙏",
+    "Merci de t’y intéresser 😊",
+    "Franchement ça fait plaisir 💚"
+  ];
+
+  const transitions = [
+    "Du coup",
+    "En vrai",
+    "Honnêtement",
+    "Ce que tu peux faire",
+    "Je te conseille"
+  ];
+
+  // SALUTATION
+  if (text.match(/bonjour|salut|hey/)) {
+    return random([
+      "Salut 😊 ! Bienvenue chez Solidazen 💚 Tu veux découvrir nos actions ou nos produits solidaires ?",
+      "Hello 👋 ! Ici Solidazen 💚 On aide les personnes en difficulté. Tu cherches quoi exactement ?",
+      "Salut ! 💚 Tu veux aider, acheter solidaire ou juste te renseigner ?"
+    ]);
   }
 
-  // AIDE
-  if (text.includes("aide") || text.includes("besoin")) {
-    return "💚 Solidazen aide les personnes en difficulté avec des dons et des produits solidaires. Tu veux en savoir plus ?";
+  // AIDE / ASSOCIATION
+  if (text.match(/aide|association|solidarité|sans abri/)) {
+    return `${random(empathie)}.
+
+Solidazen aide concrètement les personnes en difficulté (nourriture, vêtements, etc).
+
+${random(transitions)} tu peux soit soutenir avec un don, soit acheter un produit solidaire 🙏`;
   }
 
-  // BOUTIQUE
-  if (text.includes("produit") || text.includes("boutique") || text.includes("prix")) {
-    const p = produits[Math.floor(Math.random() * produits.length)];
+  // PRODUITS
+  if (text.match(/produit|boutique|acheter|prix/)) {
+    const p = random(produits);
 
-    return `🛍️ On a plein de produits solidaires !
+    return `${random(empathie)} 😊
+
+On a pas mal de choses solidaires !
 
 👉 ${p.name} - ${p.price}
 
-Chaque achat aide directement une personne dans le besoin 💚
+💚 Chaque achat aide directement quelqu’un dans le besoin.
 
-👉 Acheter / soutenir :
+👉 Acheter ici :
 ${process.env.PAYPAL_LINK}`;
   }
 
   // DON
-  if (text.includes("don") || text.includes("soutenir")) {
-    return `💚 Merci pour ton soutien !
+  if (text.match(/don|soutenir|aider financièrement/)) {
+    return `${random(empathie)} 🙏
 
-👉 Faire un don ici :
+Chaque don compte vraiment, même petit.
+
+👉 Faire un don :
 ${process.env.PAYPAL_LINK}
 
-Chaque euro compte 🙏`;
+💚 Merci pour ton soutien, ça change des vies.`;
   }
 
-  // PAR DÉFAUT (réponse intelligente simulée)
-  return "Je comprends 👍 Tu peux me parler de dons, de produits ou d’aide. Je suis là pour toi 💚";
+  // CONVERSION DOUCE (ULTRA IMPORTANT)
+  if (text.length > 5) {
+    const p = random(produits);
+
+    return `${random(empathie)} 😊
+
+Si tu veux aider concrètement :
+
+👉 ${p.name} - ${p.price}
+
+ou
+
+👉 faire un don ici :
+${process.env.PAYPAL_LINK}
+
+💚 même un petit geste fait une vraie différence.`;
+  }
+
+  return "Je suis là si tu veux aider ou découvrir Solidazen 💚";
 }
 
-/* 🤖 BOT READY */
+/* 🤖 READY */
 client.once('ready', () => {
-  console.log("🤖 Bot Solidazen GRATUIT connecté !");
+  console.log("🤖 Solidazen IA GRATUITE ULTRA connectée !");
 });
 
 /* 💬 MESSAGE */
@@ -73,7 +124,11 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   const reply = reponseIA(message.content);
-  message.reply(reply);
+
+  // simulation “humain”
+  setTimeout(() => {
+    message.reply(reply);
+  }, Math.random() * 1500 + 500);
 });
 
 /* 🌐 KEEP ALIVE */

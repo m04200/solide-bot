@@ -14,64 +14,90 @@ const app = express();
 
 /* 💚 PRODUITS */
 const produits = [
-  { name: "DVD occasion", price: "2€" },
-  { name: "Livre solidaire", price: "1€" },
-  { name: "Jeu enfant", price: "3€" },
-  { name: "Lot jouets", price: "5€" },
-  { name: "Pack solidarité", price: "10€" }
+  { name: "DVD occasion", price: "2€", type: "divertissement" },
+  { name: "Livre solidaire", price: "1€", type: "lecture" },
+  { name: "Jeu enfant", price: "3€", type: "famille" },
+  { name: "Lot jouets", price: "5€", type: "enfant" },
+  { name: "Pack solidarité", price: "10€", type: "don" }
 ];
 
-/* 🎯 réponses variées */
+/* 🧠 MÉMOIRE UTILISATEUR */
+const users = {};
+
+/* 🎯 outils */
 function random(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/* 🧠 simulation IA humaine */
-function reponseIA(userMessage) {
-  const text = userMessage.toLowerCase();
+/* 🧠 analyser intention */
+function detectIntent(text) {
+  text = text.toLowerCase();
 
-  // émotions / ton humain
+  if (text.match(/bonjour|salut|hey/)) return "greeting";
+  if (text.match(/produit|prix|acheter|boutique/)) return "buy";
+  if (text.match(/don|soutenir|aider/)) return "don";
+  if (text.match(/quoi|info|association/)) return "info";
+
+  return "other";
+}
+
+/* 🧠 choisir produit intelligent */
+function suggestProduct(userId) {
+  const user = users[userId] || {};
+
+  if (user.interest === "famille") {
+    return produits.find(p => p.type === "enfant");
+  }
+
+  if (user.interest === "lecture") {
+    return produits.find(p => p.type === "lecture");
+  }
+
+  return random(produits);
+}
+
+/* 🤖 IA VERSION BOSS */
+function generateReply(message, userId) {
+  const text = message.toLowerCase();
+  const intent = detectIntent(text);
+
+  if (!users[userId]) {
+    users[userId] = { messages: 0 };
+  }
+
+  users[userId].messages++;
+
   const empathie = [
-    "Je vois 👍",
-    "Je comprends 💚",
-    "C’est super important 🙏",
-    "Merci de t’y intéresser 😊",
-    "Franchement ça fait plaisir 💚"
+    "Je comprends 👍",
+    "Merci pour ton message 💚",
+    "Franchement c’est top 🙏",
+    "Ça fait plaisir 😊"
   ];
 
-  const transitions = [
-    "Du coup",
-    "En vrai",
-    "Honnêtement",
-    "Ce que tu peux faire",
-    "Je te conseille"
-  ];
-
-  // SALUTATION
-  if (text.match(/bonjour|salut|hey/)) {
+  /* GREETING */
+  if (intent === "greeting") {
     return random([
-      "Salut 😊 ! Bienvenue chez Solidazen 💚 Tu veux découvrir nos actions ou nos produits solidaires ?",
-      "Hello 👋 ! Ici Solidazen 💚 On aide les personnes en difficulté. Tu cherches quoi exactement ?",
-      "Salut ! 💚 Tu veux aider, acheter solidaire ou juste te renseigner ?"
+      "Salut 😊 ! Bienvenue chez Solidazen 💚 Tu veux aider ou découvrir nos produits ?",
+      "Hello 👋 ! Ici Solidazen 💚 On aide concrètement les personnes en difficulté. Tu veux voir comment ?"
     ]);
   }
 
-  // AIDE / ASSOCIATION
-  if (text.match(/aide|association|solidarité|sans abri/)) {
-    return `${random(empathie)}.
+  /* INFO */
+  if (intent === "info") {
+    return `${random(empathie)}
 
-Solidazen aide concrètement les personnes en difficulté (nourriture, vêtements, etc).
+Solidazen aide les personnes en difficulté avec des dons et des produits solidaires.
 
-${random(transitions)} tu peux soit soutenir avec un don, soit acheter un produit solidaire 🙏`;
+👉 Tu peux soit acheter solidaire, soit faire un don 🙏`;
   }
 
-  // PRODUITS
-  if (text.match(/produit|boutique|acheter|prix/)) {
-    const p = random(produits);
+  /* ACHAT */
+  if (intent === "buy") {
+    const p = suggestProduct(userId);
+
+    users[userId].interest = p.type;
 
     return `${random(empathie)} 😊
-
-On a pas mal de choses solidaires !
 
 👉 ${p.name} - ${p.price}
 
@@ -81,34 +107,32 @@ On a pas mal de choses solidaires !
 ${process.env.PAYPAL_LINK}`;
   }
 
-  // DON
-  if (text.match(/don|soutenir|aider financièrement/)) {
+  /* DON */
+  if (intent === "don") {
     return `${random(empathie)} 🙏
 
-Chaque don compte vraiment, même petit.
+💚 Chaque don a un impact réel.
 
 👉 Faire un don :
-${process.env.PAYPAL_LINK}
-
-💚 Merci pour ton soutien, ça change des vies.`;
+${process.env.PAYPAL_LINK}`;
   }
 
-  // CONVERSION DOUCE (ULTRA IMPORTANT)
-  if (text.length > 5) {
-    const p = random(produits);
+  /* RELANCE AUTOMATIQUE (SECRET PUISSANT) */
+  if (users[userId].messages >= 3) {
+    const p = suggestProduct(userId);
 
     return `${random(empathie)} 😊
 
-Si tu veux aider concrètement :
+Juste pour te dire :
 
 👉 ${p.name} - ${p.price}
 
 ou
 
-👉 faire un don ici :
+👉 soutenir ici :
 ${process.env.PAYPAL_LINK}
 
-💚 même un petit geste fait une vraie différence.`;
+💚 même un petit geste aide énormément.`;
   }
 
   return "Je suis là si tu veux aider ou découvrir Solidazen 💚";
@@ -116,16 +140,15 @@ ${process.env.PAYPAL_LINK}
 
 /* 🤖 READY */
 client.once('ready', () => {
-  console.log("🤖 Solidazen IA GRATUITE ULTRA connectée !");
+  console.log("🤖 Solidazen BOSS BOT connecté !");
 });
 
 /* 💬 MESSAGE */
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  const reply = reponseIA(message.content);
+  const reply = generateReply(message.content, message.author.id);
 
-  // simulation “humain”
   setTimeout(() => {
     message.reply(reply);
   }, Math.random() * 1500 + 500);

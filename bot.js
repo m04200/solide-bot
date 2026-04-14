@@ -2,10 +2,13 @@ require('dotenv').config();
 
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
+const fs = require('fs');
 
 const app = express();
 
-/* 🤖 CLIENT DISCORD (VERSION SAFE) */
+/* =========================
+   🤖 CONFIG DISCORD SAFE
+========================= */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -14,96 +17,214 @@ const client = new Client({
   ]
 });
 
-/* 🔐 CONFIG SAFE */
+/* =========================
+   🔐 CONFIG
+========================= */
 const PAYPAL = process.env.PAYPAL_LINK || "https://www.paypal.com/paypalme/solidazen";
+const DB_FILE = "./database.json";
 
-/* 💚 PRODUITS */
-const produits = [
-  { name: "DVD occasion", price: "2€" },
-  { name: "Livre solidaire", price: "1€" },
-  { name: "Jeu enfant", price: "3€" },
-  { name: "Lot jouets", price: "5€" },
-  { name: "Pack solidarité", price: "10€" }
-];
+/* =========================
+   💾 DATABASE SIMPLE
+========================= */
+function loadDB() {
+  if (!fs.existsSync(DB_FILE)) return {};
+  return JSON.parse(fs.readFileSync(DB_FILE));
+}
 
-/* 🧠 SIMULATION IA SIMPLE (ULTRA STABLE) */
-function brain(message) {
-  const text = message.toLowerCase();
+function saveDB(data) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
 
-  if (text.includes("bonjour") || text.includes("salut")) {
-    return "Salut 👋💚 Bienvenue chez Solidazen ! Tu veux aider ou découvrir nos produits ?";
+let db = loadDB();
+
+/* =========================
+   👤 USER SYSTEM
+========================= */
+function getUser(id) {
+  if (!db[id]) {
+    db[id] = {
+      messages: 0,
+      interest: null,
+      lastSeen: Date.now(),
+      segment: "👀 visiteur",
+      score: 0
+    };
+  }
+  return db[id];
+}
+
+/* =========================
+   🧠 IA LOCALE
+========================= */
+function localAI(input) {
+  const réponses = [
+    "💚 Solidazen aide concrètement les personnes en difficulté.",
+    "🙏 Chaque action compte.",
+    "🛍️ Acheter solidaire = aider directement.",
+    "🔥 Tu peux changer une vie aujourd’hui.",
+    "💡 Merci de t’intéresser à Solidazen."
+  ];
+
+  if (input.includes("don")) {
+    return `💚 Tu peux aider ici :\n👉 ${PAYPAL}`;
   }
 
-  if (text.includes("aide") || text.includes("association")) {
-    return `💚 Solidazen aide les personnes en difficulté.
+  if (input.includes("acheter")) {
+    return `🛍️ Boutique solidaire :\n👉 ${PAYPAL}`;
+  }
 
-Tu peux :
-- faire un don 🙏
-- acheter solidaire 🛍️
+  return réponses[Math.floor(Math.random() * réponses.length)];
+}
 
+/* =========================
+   📊 SCORE + SEGMENTATION
+========================= */
+function scoreUser(user) {
+  let score = 0;
+
+  if (user.messages > 5) score += 2;
+  if (user.messages > 10) score += 3;
+  if (user.interest === "don") score += 5;
+  if (user.interest === "achat") score += 3;
+
+  user.score = score;
+
+  if (score > 7) user.segment = "🔥 client chaud";
+  else if (score > 3) user.segment = "🙂 intéressé";
+  else user.segment = "👀 visiteur";
+}
+
+/* =========================
+   💰 TUNNEL DE VENTE
+========================= */
+function salesTunnel(user) {
+
+  if (user.segment.includes("visiteur")) {
+    return `👀 Tu découvres Solidazen.
+
+💚 Regarde comment aider :
 👉 ${PAYPAL}`;
   }
 
-  if (text.includes("acheter") || text.includes("produit") || text.includes("prix")) {
-    const p = produits[Math.floor(Math.random() * produits.length)];
+  if (user.segment.includes("intéressé")) {
+    return `🙂 Tu sembles intéressé.
 
-    return `🛍️ Produit disponible :
-
-👉 ${p.name} - ${p.price}
-
-💚 Chaque achat aide quelqu’un.
-
-👉 Acheter ici :
-${PAYPAL}`;
+🙏 Un petit geste peut aider :
+👉 ${PAYPAL}`;
   }
 
-  if (text.includes("don") || text.includes("soutenir")) {
-    return `💚 Merci pour ton soutien 🙏
+  if (user.segment.includes("chaud")) {
+    return `🔥 Tu es prêt à agir.
 
-👉 Faire un don ici :
-${PAYPAL}
-
-Chaque euro compte.`;
+💰 Passe à l’action maintenant :
+👉 ${PAYPAL}`;
   }
-
-  return "💚 Je suis là pour t’aider. Tu peux parler de dons, produits ou aide.";
 }
 
-/* 🤖 READY */
-client.once('ready', () => {
-  console.log("🤖 Solidazen STABLE PRO connecté !");
-});
+/* =========================
+   📩 DM AUTOMATIQUE
+========================= */
+async function sendDM(userObj, discordUser) {
+  try {
+    if (!discordUser) return;
 
-/* 💬 MESSAGE */
-client.on('messageCreate', (message) => {
+    let message = "";
+
+    if (userObj.segment.includes("chaud")) {
+      message = `🔥 Tu peux avoir un impact réel maintenant :
+👉 ${PAYPAL}`;
+    } else {
+      message = `💚 Merci pour ton intérêt 🙏
+👉 ${PAYPAL}`;
+    }
+
+    await discordUser.send(message);
+
+  } catch (e) {}
+}
+
+/* =========================
+   🔁 RELANCE AUTO
+========================= */
+setInterval(() => {
+  const now = Date.now();
+
+  for (let id in db) {
+    const user = db[id];
+
+    if (now - user.lastSeen > 3600000) { // 1h
+      const discordUser = client.users.cache.get(id);
+      sendDM(user, discordUser);
+    }
+  }
+
+}, 600000);
+
+/* =========================
+   💬 MESSAGE SYSTEM
+========================= */
+client.on('messageCreate', async (message) => {
   try {
     if (message.author.bot) return;
 
-    const reply = brain(message.content);
+    const user = getUser(message.author.id);
 
-    setTimeout(() => {
-      message.reply(reply).catch(() => {});
-    }, 800);
+    user.messages++;
+    user.lastSeen = Date.now();
+
+    const text = message.content.toLowerCase();
+
+    if (text.includes("don")) user.interest = "don";
+    if (text.includes("acheter")) user.interest = "achat";
+
+    scoreUser(user);
+
+    let reply = "";
+
+    if (text.length < 5) {
+      reply = localAI(text);
+    } else {
+      reply = salesTunnel(user);
+    }
+
+    saveDB(db);
+
+    await message.reply(reply);
 
   } catch (err) {
-    console.log("❌ ERROR:", err.message);
+    console.log("ERROR:", err.message);
   }
 });
 
-/* 🌐 EXPRESS KEEP ALIVE (RENDER) */
-app.get("/", (req, res) => {
-  res.send("Solidazen bot OK 💚");
+/* =========================
+   🤖 READY
+========================= */
+client.once('ready', () => {
+  console.log("🤖 SOLIDAZEN ULTIME ONLINE 💰");
 });
+
+/* =========================
+   🌐 SERVER (ANTI-OFFLINE)
+========================= */
+app.get("/", (req, res) => {
+  res.send("Bot actif 💚");
+});
+
+setInterval(() => {
+  console.log("💚 Alive:", new Date().toLocaleTimeString());
+}, 300000);
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("🌐 Serveur OK sur port", PORT);
+  console.log("🌐 Serveur sur port", PORT);
 });
 
-/* 🔐 LOGIN SAFE */
+/* =========================
+   🔐 LOGIN
+========================= */
 if (!process.env.DISCORD_TOKEN) {
-  console.log("❌ DISCORD_TOKEN manquant");
+  console.log("❌ Token manquant");
 } else {
   client.login(process.env.DISCORD_TOKEN);
 }

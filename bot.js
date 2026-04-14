@@ -133,5 +133,7 @@ app.listen(PORT, () => {
   console.log("🌐 Serveur actif sur port " + PORT);
 });
 
+console.log("IA key loaded:", process.env.OPENAI_API_KEY ? "OK" : "MISSING");
+
 /* 🔐 LOGIN DISCORD */
 client.login(process.env.DISCORD_TOKEN);

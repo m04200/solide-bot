@@ -6,30 +6,34 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers // ✅ pour détecter nouveaux membres
   ]
 });
 
 const app = express();
 
+/* 🔐 VARIABLES SAFE */
+const PAYPAL = process.env.PAYPAL_LINK || "https://www.paypal.com/paypalme/solidazen";
+
 /* 💚 PRODUITS */
 const produits = [
-  { name: "DVD occasion", price: "2€", type: "divertissement" },
+  { name: "DVD occasion", price: "2€", type: "fun" },
   { name: "Livre solidaire", price: "1€", type: "lecture" },
   { name: "Jeu enfant", price: "3€", type: "famille" },
   { name: "Lot jouets", price: "5€", type: "enfant" },
   { name: "Pack solidarité", price: "10€", type: "don" }
 ];
 
-/* 🧠 MÉMOIRE UTILISATEUR */
+/* 🧠 MÉMOIRE */
 const users = {};
+const relances = {};
 
-/* 🎯 outils */
+/* 🎯 UTILS */
 function random(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/* 🧠 analyser intention */
 function detectIntent(text) {
   text = text.toLowerCase();
 
@@ -41,22 +45,16 @@ function detectIntent(text) {
   return "other";
 }
 
-/* 🧠 choisir produit intelligent */
 function suggestProduct(userId) {
   const user = users[userId] || {};
 
-  if (user.interest === "famille") {
-    return produits.find(p => p.type === "enfant");
-  }
-
-  if (user.interest === "lecture") {
-    return produits.find(p => p.type === "lecture");
-  }
+  if (user.interest === "lecture") return produits[1];
+  if (user.interest === "famille") return produits[2];
 
   return random(produits);
 }
 
-/* 🤖 IA VERSION BOSS */
+/* 🤖 IA GRATUITE */
 function generateReply(message, userId) {
   const text = message.toLowerCase();
   const intent = detectIntent(text);
@@ -70,102 +68,130 @@ function generateReply(message, userId) {
   const empathie = [
     "Je comprends 👍",
     "Merci pour ton message 💚",
-    "Franchement c’est top 🙏",
+    "C’est top 🙏",
     "Ça fait plaisir 😊"
   ];
 
-  /* GREETING */
   if (intent === "greeting") {
     return random([
       "Salut 😊 ! Bienvenue chez Solidazen 💚 Tu veux aider ou découvrir nos produits ?",
-      "Hello 👋 ! Ici Solidazen 💚 On aide concrètement les personnes en difficulté. Tu veux voir comment ?"
+      "Hello 👋 ! On aide les personnes en difficulté 💚 Tu veux voir comment ?"
     ]);
   }
 
-  /* INFO */
   if (intent === "info") {
     return `${random(empathie)}
 
-Solidazen aide les personnes en difficulté avec des dons et des produits solidaires.
+Solidazen aide concrètement les personnes en difficulté.
 
-👉 Tu peux soit acheter solidaire, soit faire un don 🙏`;
+👉 Tu peux soit faire un don, soit acheter solidaire 💚`;
   }
 
-  /* ACHAT */
   if (intent === "buy") {
     const p = suggestProduct(userId);
-
     users[userId].interest = p.type;
 
     return `${random(empathie)} 😊
 
 👉 ${p.name} - ${p.price}
 
-💚 Chaque achat aide directement quelqu’un dans le besoin.
+💚 Chaque achat aide quelqu’un.
 
 👉 Acheter ici :
-${process.env.PAYPAL_LINK}`;
+${PAYPAL}`;
   }
 
-  /* DON */
   if (intent === "don") {
     return `${random(empathie)} 🙏
 
-💚 Chaque don a un impact réel.
+💚 Même 1€ peut aider énormément.
 
 👉 Faire un don :
-${process.env.PAYPAL_LINK}`;
+${PAYPAL}`;
   }
 
-  /* RELANCE AUTOMATIQUE (SECRET PUISSANT) */
-  const relances = {};
+  // relance douce après plusieurs messages
   if (users[userId].messages >= 3) {
     const p = suggestProduct(userId);
 
     return `${random(empathie)} 😊
-
-Juste pour te dire :
 
 👉 ${p.name} - ${p.price}
 
 ou
 
 👉 soutenir ici :
-${process.env.PAYPAL_LINK}
+${PAYPAL}
 
-💚 même un petit geste aide énormément.`;
+💚 Merci 🙏`;
   }
 
   return "Je suis là si tu veux aider ou découvrir Solidazen 💚";
 }
 
-/* 🤖 READY */
-client.once('ready', () => {
-  console.log("🤖 Solidazen BOSS BOT connecté !");
+/* 🤖 BOT READY */
+client.once('clientReady', () => {
+  console.log("🤖 Solidazen MACHINE À CASH connectée !");
+});
+
+/* 📩 NOUVEAUX MEMBRES (SAFE) */
+client.on('guildMemberAdd', async (member) => {
+  try {
+    await member.send(`Salut 👋 bienvenue chez Solidazen 💚
+
+👉 Tu peux aider ici :
+${PAYPAL}
+
+Merci 🙏`);
+  } catch (err) {
+    console.log("❌ DM impossible");
+  }
 });
 
 /* 💬 MESSAGE */
-const userId = message.author.id;
-
-if (!relances[userId]) {
-  relances[userId] = setTimeout(() => {
-    message.channel.send(`💚 Juste pour te dire :
-
-Même 1€ peut vraiment aider quelqu’un.
-
-👉 ${process.env.PAYPAL_LINK}
-
-Merci 🙏`);
-  }, 60000); // 1 minute après
-}
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  const reply = generateReply(message.content, message.author.id);
+  const userId = message.author.id;
 
+  const reply = generateReply(message.content, userId);
+
+  // réponse avec effet humain
   setTimeout(() => {
     message.reply(reply);
   }, Math.random() * 1500 + 500);
+
+  /* 💰 RELANCE AUTO (SAFE) */
+  if (!relances[userId]) {
+    relances[userId] = setTimeout(() => {
+      if (message.channel) {
+        message.channel.send(`💚 Juste pour te dire :
+
+Même un petit don aide énormément 🙏
+
+👉 ${PAYPAL}`);
+      }
+    }, 60000);
+  }
+
+  /* 🛒 COMMANDE */
+  if (message.content === "!boutique") {
+    message.reply(`🛍️ Boutique :
+
+DVD - 2€
+Livre - 1€
+Jeux - 3€
+Pack - 10€
+
+👉 ${PAYPAL}`);
+  }
+
+  /* 💥 TRIGGER */
+  if (message.content.toLowerCase() === "ok") {
+    message.reply(`💚 Merci !
+
+👉 ${PAYPAL}`);
+  }
 });
 
 /* 🌐 KEEP ALIVE */
@@ -173,49 +199,9 @@ app.get("/", (req, res) => {
   res.send("Bot actif");
 });
 
-app.listen(3000, () => {
-  console.log("Serveur actif");
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🌐 Serveur actif");
 });
 
 /* 🔐 LOGIN */
 client.login(process.env.DISCORD_TOKEN);
-});
-
-/* 📩 MESSAGE AUTO AUX NOUVEAUX (ULTRA PUISSANT) */
-client.on('guildMemberAdd', (member) => {
-  member.send(`Salut 👋 et bienvenue chez Solidazen 💚
-
-On aide concrètement les personnes en difficulté.
-
-👉 Tu peux aider facilement :
-- soit avec un petit don
-- soit en achetant solidaire
-
-💚 Lien direct :
-${process.env.PAYPAL_LINK}
-
-Merci d’être là 🙏`);
-});
-/* 🛒 COMMANDE DIRECTE (VENTE RAPIDE */
-if (message.content === "!boutique") {
-  message.reply(`🛍️ Boutique solidaire :
-
-DVD - 2€
-Livre - 1€
-Jeux - 3€
-Pack - 10€
-
-👉 Acheter ici :
-${process.env.PAYPAL_LINK}`);
-}
-});
-/* 💰 TRIGGER ULTRA PUISSANT (CONVERSION) */
-if (message.content.toLowerCase().includes("ok")) {
-  message.reply(`💚 Génial !
-
-👉 Tu peux soutenir ici :
-${process.env.PAYPAL_LINK}
-
-Chaque geste compte 🙏`);
-}
-});

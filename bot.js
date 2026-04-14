@@ -1,19 +1,7 @@
 require('dotenv').config();
-
 const { Client, GatewayIntentBits } = require('discord.js');
-const axios = require('axios');
 const express = require('express');
 
-/* 🔥 ANTI CRASH */
-process.on("unhandledRejection", (err) => {
-  console.log("❌ Unhandled Rejection:", err);
-});
-
-process.on("uncaughtException", (err) => {
-  console.log("❌ Uncaught Exception:", err);
-});
-
-/* 🤖 DISCORD BOT */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,10 +10,9 @@ const client = new Client({
   ]
 });
 
-/* 🌐 EXPRESS SERVER (RENDER) */
 const app = express();
 
-/* 💚 PRODUITS SOLIDAZEN */
+/* 💚 PRODUITS */
 const produits = [
   { name: "DVD occasion", price: "2€" },
   { name: "Livre solidaire", price: "1€" },
@@ -34,108 +21,69 @@ const produits = [
   { name: "Pack solidarité", price: "10€" }
 ];
 
-/* 🧠 IA PERSONNALITÉ */
-const SYSTEM_PROMPT = `
-Tu es l'assistant officiel de Solidazen.
+/* 🎯 réponse humaine simulée */
+function reponseIA(message) {
+  const text = message.toLowerCase();
 
-Tu es :
-- humain, chaleureux, simple
-- orienté aide et solidarité
-- jamais agressif commercialement
+  // SALUTATIONS
+  if (text.includes("bonjour") || text.includes("salut")) {
+    return "Salut 😊 ! Je suis là pour t’aider. Tu cherches à soutenir Solidazen ou à découvrir nos produits solidaires ?";
+  }
 
-Tu peux proposer :
-- dons Solidazen
-- produits d’occasion
-`;
+  // AIDE
+  if (text.includes("aide") || text.includes("besoin")) {
+    return "💚 Solidazen aide les personnes en difficulté avec des dons et des produits solidaires. Tu veux en savoir plus ?";
+  }
 
-/* 🎯 produit aléatoire */
-function randomProduct() {
-  return produits[Math.floor(Math.random() * produits.length)];
+  // BOUTIQUE
+  if (text.includes("produit") || text.includes("boutique") || text.includes("prix")) {
+    const p = produits[Math.floor(Math.random() * produits.length)];
+
+    return `🛍️ On a plein de produits solidaires !
+
+👉 ${p.name} - ${p.price}
+
+Chaque achat aide directement une personne dans le besoin 💚
+
+👉 Acheter / soutenir :
+${process.env.PAYPAL_LINK}`;
+  }
+
+  // DON
+  if (text.includes("don") || text.includes("soutenir")) {
+    return `💚 Merci pour ton soutien !
+
+👉 Faire un don ici :
+${process.env.PAYPAL_LINK}
+
+Chaque euro compte 🙏`;
+  }
+
+  // PAR DÉFAUT (réponse intelligente simulée)
+  return "Je comprends 👍 Tu peux me parler de dons, de produits ou d’aide. Je suis là pour toi 💚";
 }
 
-/* 🤖 READY */
+/* 🤖 BOT READY */
 client.once('ready', () => {
-  console.log("🤖 Solidazen IA Bot connecté !");
+  console.log("🤖 Bot Solidazen GRATUIT connecté !");
 });
 
-/* 💬 MESSAGE IA */
+/* 💬 MESSAGE */
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  try {
-    const userMessage = message.content;
-    const text = userMessage.toLowerCase();
-
-    /* 🧠 APPEL IA */
-    const ia = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage }
-        ],
-        temperature: 0.8
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        }
-      }
-    );
-
-    let reply = ia.data?.choices?.[0]?.message?.content 
-      || "Je n'ai pas compris 😅";
-
-    /* 🛒 LOGIQUE VENTE */
-    if (
-      text.includes("acheter") ||
-      text.includes("produit") ||
-      text.includes("prix") ||
-      text.includes("boutique")
-    ) {
-      const p = randomProduct();
-
-      reply += `\n\n🛍️ Produit Solidazen :
-👉 ${p.name} - ${p.price}
-💚 Acheter / soutenir :
-${process.env.PAYPAL_LINK}`;
-    }
-
-    /* 💰 LOGIQUE DON */
-    if (
-      text.includes("don") ||
-      text.includes("aide") ||
-      text.includes("soutenir")
-    ) {
-      reply += `\n\n💚 Merci pour ton soutien !
-👉 Faire un don :
-${process.env.PAYPAL_LINK}`;
-    }
-
-    message.reply(reply);
-
-  } catch (err) {
-  console.log("❌ OPENAI FULL ERROR:", JSON.stringify(err.response?.data, null, 2));
-  console.log("❌ MESSAGE:", err.message);
-
-  message.reply("❌ IA erreur : " + (err.response?.data?.error?.message || err.message));
-  }
+  const reply = reponseIA(message.content);
+  message.reply(reply);
 });
 
-/* 🌐 KEEP ALIVE (RENDER) */
+/* 🌐 KEEP ALIVE */
 app.get("/", (req, res) => {
-  res.send("Solidazen bot actif 🤖");
+  res.send("Bot actif");
 });
 
-/* ⚡ PORT DYNAMIQUE (IMPORTANT RENDER) */
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("🌐 Serveur actif sur port " + PORT);
+app.listen(3000, () => {
+  console.log("Serveur actif");
 });
 
-console.log("IA key loaded:", process.env.OPENAI_API_KEY ? "OK" : "MISSING");
-
-/* 🔐 LOGIN DISCORD */
+/* 🔐 LOGIN */
 client.login(process.env.DISCORD_TOKEN);

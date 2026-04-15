@@ -1,230 +1,179 @@
-require('dotenv').config();
+const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField } = require("discord.js");
+const dotenv = require("dotenv");
+const config = require("./config.json");
 
-const { Client, GatewayIntentBits } = require('discord.js');
-const express = require('express');
-const fs = require('fs');
+dotenv.config();
 
-const app = express();
-
-/* =========================
-   🤖 CONFIG DISCORD SAFE
-========================= */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
+  ],
+  partials: [Partials.Channel]
 });
 
-/* =========================
-   🔐 CONFIG
-========================= */
-const PAYPAL = process.env.PAYPAL_LINK || "https://www.paypal.com/paypalme/solidazen";
-const DB_FILE = "./database.json";
+// =========================
+// READY
+// =========================
+client.once("ready", () => {
+  console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
+});
 
-/* =========================
-   💾 DATABASE SIMPLE
-========================= */
-function loadDB() {
-  if (!fs.existsSync(DB_FILE)) return {};
-  return JSON.parse(fs.readFileSync(DB_FILE));
-}
+// =========================
+// WELCOME SYSTEM
+// =========================
+client.on("guildMemberAdd", member => {
+  const channel = member.guild.channels.cache.get(config.welcomeChannel);
+  if (!channel) return;
 
-function saveDB(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
+  const embed = new EmbedBuilder()
+    .setColor("Green")
+    .setTitle("Bienvenue chez Solidazen ❤️")
+    .setDescription(`Bonjour ${member}, bienvenue dans notre association Solidazen 🙏\nNous aidons les personnes en grande précarité.`)
+    .setFooter({ text: "Solidazen Association" });
 
-let db = loadDB();
+  channel.send({ embeds: [embed] });
+});
 
-/* =========================
-   👤 USER SYSTEM
-========================= */
-function getUser(id) {
-  if (!db[id]) {
-    db[id] = {
-      messages: 0,
-      interest: null,
-      lastSeen: Date.now(),
-      segment: "👀 visiteur",
-      score: 0
-    };
-  }
-  return db[id];
-}
+// =========================
+// COMMANDES
+// =========================
+client.on("messageCreate", async message => {
+  if (!message.content.startsWith(process.env.PREFIX) || message.author.bot) return;
 
-/* =========================
-   🧠 IA LOCALE
-========================= */
-function localAI(input) {
-  const réponses = [
-    "💚 Solidazen aide concrètement les personnes en difficulté.",
-    "🙏 Chaque action compte.",
-    "🛍️ Acheter solidaire = aider directement.",
-    "🔥 Tu peux changer une vie aujourd’hui.",
-    "💡 Merci de t’intéresser à Solidazen."
-  ];
+  const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/);
+  const cmd = args.shift().toLowerCase();
 
-  if (input.includes("don")) {
-    return `💚 Tu peux aider ici :\n👉 ${PAYPAL}`;
+  // HELP
+  if (cmd === "help") {
+    const embed = new EmbedBuilder()
+      .setColor("Blue")
+      .setTitle("Commandes Solidazen")
+      .setDescription(`
+!help - Affiche les commandes
+!don - Infos dons
+!kick @user
+!ban @user
+!clear 10
+!ticket
+      `);
+    return message.reply({ embeds: [embed] });
   }
 
-  if (input.includes("acheter")) {
-    return `🛍️ Boutique solidaire :\n👉 ${PAYPAL}`;
+  // DON
+  if (cmd === "don") {
+    const embed = new EmbedBuilder()
+      .setColor("Gold")
+      .setTitle("💰 Soutenir Solidazen")
+      .setDescription(`
+🙏 Merci pour votre soutien !
+
+PayPal : https://www.paypal.com/paypalme/solidazen
+
+💳 Virement :
+IBAN : FR76 XXXX XXXX XXXX XXXX
+
+📮 Courrier :
+Solidazen - 18 rue Molière, 42160 Andrézieux
+      `);
+    return message.channel.send({ embeds: [embed] });
   }
 
-  return réponses[Math.floor(Math.random() * réponses.length)];
-}
+  // CLEAR
+  if (cmd === "clear") {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages))
+      return message.reply("❌ Permission refusée");
 
-/* =========================
-   📊 SCORE + SEGMENTATION
-========================= */
-function scoreUser(user) {
-  let score = 0;
+    const amount = parseInt(args[0]);
+    if (!amount) return message.reply("Nombre invalide");
 
-  if (user.messages > 5) score += 2;
-  if (user.messages > 10) score += 3;
-  if (user.interest === "don") score += 5;
-  if (user.interest === "achat") score += 3;
-
-  user.score = score;
-
-  if (score > 7) user.segment = "🔥 client chaud";
-  else if (score > 3) user.segment = "🙂 intéressé";
-  else user.segment = "👀 visiteur";
-}
-
-/* =========================
-   💰 TUNNEL DE VENTE
-========================= */
-function salesTunnel(user) {
-
-  if (user.segment.includes("visiteur")) {
-    return `👀 Tu découvres Solidazen.
-
-💚 Regarde comment aider :
-👉 ${PAYPAL}`;
+    await message.channel.bulkDelete(amount);
+    message.channel.send(`🧹 ${amount} messages supprimés`).then(m => setTimeout(() => m.delete(), 3000));
   }
 
-  if (user.segment.includes("intéressé")) {
-    return `🙂 Tu sembles intéressé.
+  // KICK
+  if (cmd === "kick") {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers))
+      return message.reply("❌ Permission refusée");
 
-🙏 Un petit geste peut aider :
-👉 ${PAYPAL}`;
+    const user = message.mentions.members.first();
+    if (!user) return message.reply("Utilisateur invalide");
+
+    user.kick();
+    message.channel.send(`👢 ${user.user.tag} expulsé`);
   }
 
-  if (user.segment.includes("chaud")) {
-    return `🔥 Tu es prêt à agir.
+  // BAN
+  if (cmd === "ban") {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers))
+      return message.reply("❌ Permission refusée");
 
-💰 Passe à l’action maintenant :
-👉 ${PAYPAL}`;
+    const user = message.mentions.members.first();
+    if (!user) return message.reply("Utilisateur invalide");
+
+    user.ban();
+    message.channel.send(`⛔ ${user.user.tag} banni`);
   }
-}
 
-/* =========================
-   📩 DM AUTOMATIQUE
-========================= */
-async function sendDM(userObj, discordUser) {
-  try {
-    if (!discordUser) return;
+  // TICKET SIMPLE
+  if (cmd === "ticket") {
+    const channel = await message.guild.channels.create({
+      name: `ticket-${message.author.username}`,
+      type: 0,
+      parent: config.ticketCategory,
+      permissionOverwrites: [
+        {
+          id: message.guild.id,
+          deny: [PermissionsBitField.Flags.ViewChannel]
+        },
+        {
+          id: message.author.id,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+        },
+        {
+          id: config.staffRole,
+          allow: [PermissionsBitField.Flags.ViewChannel]
+        }
+      ]
+    });
 
-    let message = "";
+    channel.send(`🎫 Ticket créé par ${message.author}`);
+    message.reply("🎫 Ticket créé !");
+  }
+});
 
-    if (userObj.segment.includes("chaud")) {
-      message = `🔥 Tu peux avoir un impact réel maintenant :
-👉 ${PAYPAL}`;
-    } else {
-      message = `💚 Merci pour ton intérêt 🙏
-👉 ${PAYPAL}`;
-    }
+// =========================
+// LOGS (messages supprimés)
+// =========================
+client.on("messageDelete", message => {
+  const log = message.guild.channels.cache.get(config.logChannel);
+  if (!log) return;
 
-    await discordUser.send(message);
+  log.send(`🗑️ Message supprimé dans ${message.channel} : ${message.content}`);
+});
 
-  } catch (e) {}
-}
+// =========================
+// ANTI-SPAM SIMPLE
+// =========================
+const usersMap = new Map();
 
-/* =========================
-   🔁 RELANCE AUTO
-========================= */
-setInterval(() => {
+client.on("messageCreate", message => {
+  if (message.author.bot) return;
+
   const now = Date.now();
+  const userData = usersMap.get(message.author.id) || [];
 
-  for (let id in db) {
-    const user = db[id];
+  const recent = userData.filter(t => now - t < 5000);
+  recent.push(now);
 
-    if (now - user.lastSeen > 3600000) { // 1h
-      const discordUser = client.users.cache.get(id);
-      sendDM(user, discordUser);
-    }
-  }
+  usersMap.set(message.author.id, recent);
 
-}, 600000);
-
-/* =========================
-   💬 MESSAGE SYSTEM
-========================= */
-client.on('messageCreate', async (message) => {
-  try {
-    if (message.author.bot) return;
-
-    const user = getUser(message.author.id);
-
-    user.messages++;
-    user.lastSeen = Date.now();
-
-    const text = message.content.toLowerCase();
-
-    if (text.includes("don")) user.interest = "don";
-    if (text.includes("acheter")) user.interest = "achat";
-
-    scoreUser(user);
-
-    let reply = "";
-
-    if (text.length < 5) {
-      reply = localAI(text);
-    } else {
-      reply = salesTunnel(user);
-    }
-
-    saveDB(db);
-
-    await message.reply(reply);
-
-  } catch (err) {
-    console.log("ERROR:", err.message);
+  if (recent.length > 5) {
+    message.delete();
+    message.channel.send(`🚨 ${message.author}, stop le spam !`).then(m => setTimeout(() => m.delete(), 3000));
   }
 });
 
-/* =========================
-   🤖 READY
-========================= */
-client.once('ready', () => {
-  console.log("🤖 SOLIDAZEN ULTIME ONLINE 💰");
-});
-
-/* =========================
-   🌐 SERVER (ANTI-OFFLINE)
-========================= */
-app.get("/", (req, res) => {
-  res.send("Bot actif 💚");
-});
-
-setInterval(() => {
-  console.log("💚 Alive:", new Date().toLocaleTimeString());
-}, 300000);
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("🌐 Serveur sur port", PORT);
-});
-
-/* =========================
-   🔐 LOGIN
-========================= */
-if (!process.env.DISCORD_TOKEN) {
-  console.log("❌ Token manquant");
-} else {
-  client.login(process.env.DISCORD_TOKEN);
-}
+client.login(process.env.TOKEN);
